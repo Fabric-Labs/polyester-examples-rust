@@ -1,0 +1,51 @@
+[package]
+name = "polyester-examples"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+description = "Runnable examples for the official Polyester Rust SDK."
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+polyester-sdk = { path = "../polyester-sdk-rust", version = "0.1.0-alpha.2", features = ["realtime"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+serde_json = "1"
+rust_decimal = { version = "1", default-features = false, features = ["std"] }
+anyhow = "1"
+
+[[example]]
+name = "01_public_market_data"
+path = "examples/01_public_market_data.rs"
+
+[[example]]
+name = "02_balances_and_orders_read"
+path = "examples/02_balances_and_orders_read.rs"
+
+[[example]]
+name = "03_place_and_cancel_limit_order"
+path = "examples/03_place_and_cancel_limit_order.rs"
+
+[[example]]
+name = "03b_scaled_int_limit_order"
+path = "examples/03b_scaled_int_limit_order.rs"
+
+[[example]]
+name = "04_public_realtime_trades"
+path = "examples/04_public_realtime_trades.rs"
+
+[[example]]
+name = "05_public_orderbook_stream"
+path = "examples/05_public_orderbook_stream.rs"
+
+[[example]]
+name = "06_market_overview_stream"
+path = "examples/06_market_overview_stream.rs"
+
+[[example]]
+name = "07_batch_create_and_cancel_all"
+path = "examples/07_batch_create_and_cancel_all.rs"
+
+[[example]]
+name = "10_rsi_signal_bot"
+path = "examples/10_rsi_signal_bot.rs"
