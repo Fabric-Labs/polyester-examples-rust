@@ -69,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
 
     let created = match client
         .orders
-        .batch_create(items, None, None, false)
+        .batch_create(items, None, None)
         .await
     {
         Ok(c) => c,
