@@ -19,7 +19,7 @@ cargo fetch
 ```
 
 This repository uses a local path dependency on `../polyester-sdk-rust` when working inside the
-Fabric monorepo. Point `Cargo.toml` at a git tag (`v0.1.0a7`) when consuming a published SDK
+Fabric monorepo. Point `Cargo.toml` at a git tag (`v0.1.0a21`) when consuming a published SDK
 (crate is not on crates.io yet).
 
 ## Configure
@@ -97,6 +97,7 @@ or through the wallet/on-chain flow.
 | `05_public_orderbook_stream` | Optional | No | Snapshot + stream order book |
 | `06_market_overview_stream` | Optional | No | Snapshot + stream market overview |
 | `07_batch_create_and_cancel_all` | Required | Yes (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Batch limit create, `cancel_all` |
+| `08_batch_replace` | Required | Yes (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Batch create, `batch_replace` + status, cleanup |
 | `10_rsi_signal_bot` | Optional* | Optional (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Candles + RSI; optional small limit |
 
 \* Dry-run RSI needs no credentials; live mode requires auth.
@@ -111,6 +112,7 @@ cargo run --example 10_rsi_signal_bot
 POLYESTER_EXAMPLES_ENABLE_TRADING=1 cargo run --example 03_place_and_cancel_limit_order
 POLYESTER_EXAMPLES_ENABLE_TRADING=1 cargo run --example 03b_scaled_int_limit_order
 POLYESTER_EXAMPLES_ENABLE_TRADING=1 cargo run --example 07_batch_create_and_cancel_all
+POLYESTER_EXAMPLES_ENABLE_TRADING=1 cargo run --example 08_batch_replace
 POLYESTER_EXAMPLES_ENABLE_TRADING=1 cargo run --example 10_rsi_signal_bot
 ```
 

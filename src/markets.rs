@@ -54,6 +54,16 @@ pub fn quantity_scale_for_pair(pair: Option<&PairConfig>) -> u32 {
     .unwrap_or(8)
 }
 
+pub fn quantity_scale_for_symbol(client: &Client, symbol: &str) -> anyhow::Result<u32> {
+    client
+        .catalogs
+        .base_quantity_scale_for_symbol(symbol)
+        .ok_or_else(|| {
+            anyhow::anyhow!("{symbol} quantity scale is unavailable; call wait_for_catalogs first")
+        })
+}
+
+
 pub fn quote_asset_id(client: &Client, pair: Option<&PairConfig>, symbol: &str) -> Option<u32> {
     if let Some(pair) = pair
         && !pair.quote_asset.is_empty()
@@ -237,6 +247,23 @@ fn post_only_buy_price_from_book(book: &OrderbookData, tick_size: &str) -> Optio
         return None;
     }
     Some(format_price_ticks(target))
+}
+
+
+pub fn slightly_lower_limit_price(
+    price: &str,
+    pair: Option<&PairConfig>,
+) -> anyhow::Result<String> {
+    let price = Decimal::from_str(price)?;
+    let step = tick_size(pair);
+    if step <= Decimal::ZERO {
+        anyhow::bail!("tick size must be positive");
+    }
+    let lowered = align_to_step(price - step, step, false);
+    if lowered < step {
+        return Ok(format_decimal(step));
+    }
+    Ok(format_decimal(lowered))
 }
 
 pub async fn resolve_post_only_buy_limit_price(
