@@ -97,7 +97,7 @@ or through the wallet/on-chain flow.
 | `05_public_orderbook_stream` | Optional | No | Snapshot + stream order book |
 | `06_market_overview_stream` | Optional | No | Snapshot + stream market overview |
 | `07_batch_create_and_cancel_all` | Required | Yes (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Batch limit create, `cancel_all` |
-| `08_batch_replace` | Required | Yes (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Batch create, `batch_replace` + status, cleanup |
+| `08_batch_replace` | Required | Yes (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Batch create, replacement receipt/retry, settlement polling, successor cleanup |
 | `10_rsi_signal_bot` | Optional* | Optional (`POLYESTER_EXAMPLES_ENABLE_TRADING=1`) | Candles + RSI; optional small limit |
 
 \* Dry-run RSI needs no credentials; live mode requires auth.
@@ -117,6 +117,12 @@ POLYESTER_EXAMPLES_ENABLE_TRADING=1 cargo run --example 10_rsi_signal_bot
 ```
 
 Suggested order: `01` → `04`/`05`/`06` → `02` → `10` (dry) → `03` / `03b` → `07` / `10` (live) when ready.
+
+`08_batch_replace` creates two post-only buys, submits `batch_replace` with successor client IDs,
+and prints the admission receipt. The predecessor IDs are stale after admission; later tracking and
+cleanup use each `replacement_order_id` / successor client ID. It shows how to retry an ambiguous
+call with the same `request_id`, then polls `get_batch_replace_status` until
+`is_batch_replace_settled` reports every item is `working`, `rejected`, or `terminal`.
 
 TWAP, ladder, and standalone trigger examples are intentionally omitted for v1. They use the
 triggers API (separate lifecycle from normal orders) and are a poor fit for a small cookbook.

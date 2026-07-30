@@ -30,8 +30,7 @@ async fn main() -> anyhow::Result<()> {
     let scale = quantity_scale_for_pair(pair.as_ref());
 
     // Humans still size from book/decimals; bots convert once, then stay in ints.
-    let price_decimal =
-        resolve_post_only_buy_limit_price(&client, &symbol, pair.as_ref()).await?;
+    let price_decimal = resolve_post_only_buy_limit_price(&client, &symbol, pair.as_ref()).await?;
     let asset_id = quote_asset_id(&client, pair.as_ref(), &symbol)
         .ok_or_else(|| anyhow::anyhow!("could not resolve quote asset id for {symbol}"))?;
     let balances = client.balances.list(GetBalancesRequest::default()).await?;
@@ -58,20 +57,21 @@ async fn main() -> anyhow::Result<()> {
             symbol: symbol.clone(),
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
-            quantity: Quantity::from_scaled(
+            quantity: Some(Quantity::from_scaled(
                 qty_scaled,
                 Some(scale),
                 QuantityDomain::OrderBase,
                 Some(symbol.clone()),
                 None,
-            )?,
+            )?),
+            max_quote_debit_scaled: None,
             price: Some(Price::from_ticks(price_ticks, Some(symbol.clone()))?),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some(client_order_id.clone()),
             subaccount_id: None,
             post_only: Some(true),
             market_client_ref_price: None,
-            fee_source: None,
+            fee_asset: None,
             self_trade_prevention: None,
             market_max_slippage: None,
             attached_risk: None,

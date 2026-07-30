@@ -55,14 +55,20 @@ async fn main() -> anyhow::Result<()> {
                 symbol: symbol.clone(),
                 side: CreateSide::Buy,
                 order_type: CreateOrderType::Limit,
-                quantity: Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None)?,
+                quantity: Some(Quantity::from_decimal_str(
+                    &qty,
+                    scale,
+                    Some(symbol.clone()),
+                    None,
+                )?),
+                max_quote_debit_scaled: None,
                 price: Some(Price::from_decimal_str(&price, Some(symbol.clone()))?),
                 time_in_force: Some(CreateTimeInForce::Gtc),
                 client_order_id: Some(client_order_id.clone()),
                 subaccount_id: None,
                 post_only: Some(true),
                 market_client_ref_price: None,
-                fee_source: None,
+                fee_asset: None,
                 self_trade_prevention: None,
                 market_max_slippage: None,
                 attached_risk: None,
@@ -70,11 +76,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .collect::<anyhow::Result<_>>()?;
 
-    let created = match client
-        .orders
-        .batch_create(items, None, None)
-        .await
-    {
+    let created = match client.orders.batch_create(items, None, None).await {
         Ok(c) => c,
         Err(err) => {
             cancel_all_for_symbol(&client, &symbol).await;
@@ -114,9 +116,9 @@ async fn main() -> anyhow::Result<()> {
                 "Visible in open orders: {client_order_id} status={}",
                 open.status
             ),
-            Err(err) => println!(
-                "  {client_order_id}: create accepted but open-order reads lagged ({err})"
-            ),
+            Err(err) => {
+                println!("  {client_order_id}: create accepted but open-order reads lagged ({err})")
+            }
         }
     }
 
