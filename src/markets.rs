@@ -1,9 +1,12 @@
 //! Symbol / sizing helpers for trading examples.
 
-use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
-use polyester::models::{AssetBalance, OrderbookData, SpotConfig};
-use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
+use alloy_primitives::U256;
 use polyester::Client;
+use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
+use polyester::models::{
+    AssetBalance, DepositWithdrawConfig, OrderbookData, SpotConfig, ZipperAssetConfig,
+};
+use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::str::FromStr;
@@ -54,6 +57,16 @@ pub fn quantity_scale_for_pair(pair: Option<&PairConfig>) -> u32 {
     .unwrap_or(8)
 }
 
+/// Prefer catalog scale (docs); fail closed when hydration has not resolved the symbol.
+pub fn quantity_scale_for_symbol(client: &Client, symbol: &str) -> anyhow::Result<u32> {
+    client
+        .catalogs
+        .base_quantity_scale_for_symbol(symbol)
+        .ok_or_else(|| {
+            anyhow::anyhow!("{symbol} quantity scale is unavailable; call wait_for_catalogs first")
+        })
+}
+
 pub fn quote_asset_id(client: &Client, pair: Option<&PairConfig>, symbol: &str) -> Option<u32> {
     if let Some(pair) = pair
         && !pair.quote_asset.is_empty()
@@ -82,11 +95,7 @@ pub fn quote_asset_symbol(pair: Option<&PairConfig>, symbol: &str) -> String {
     {
         return pair.quote_asset.clone();
     }
-    symbol
-        .split('-')
-        .nth(1)
-        .unwrap_or("USDT")
-        .to_owned()
+    symbol.split('-').nth(1).unwrap_or("USDT").to_owned()
 }
 
 pub fn format_decimal(value: Decimal) -> String {
@@ -100,7 +109,7 @@ pub fn format_decimal(value: Decimal) -> String {
     }
 }
 
-fn tick_size(pair: Option<&PairConfig>) -> Decimal {
+pub fn tick_size(pair: Option<&PairConfig>) -> Decimal {
     pair.and_then(|p| {
         let s = p.tick_size.trim();
         if s.is_empty() {
@@ -110,6 +119,88 @@ fn tick_size(pair: Option<&PairConfig>) -> Decimal {
         }
     })
     .unwrap_or(Decimal::new(1, 2))
+}
+
+pub fn slightly_lower_limit_price(
+    price: &str,
+    pair: Option<&PairConfig>,
+) -> anyhow::Result<String> {
+    let price = Decimal::from_str(price)?;
+    let step = tick_size(pair);
+    if step <= Decimal::ZERO {
+        anyhow::bail!("tick size must be positive");
+    }
+    let lowered = align_to_step(price - step, step, false);
+    if lowered < step {
+        return Ok(format_decimal(step));
+    }
+    Ok(format_decimal(lowered))
+}
+
+pub fn min_base_qty_for_pair(pair: Option<&PairConfig>, price: &str) -> anyhow::Result<String> {
+    let price = Decimal::from_str(price)?;
+    let step = pair
+        .and_then(|p| {
+            let s = p.step_size.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Decimal::from_str(s).ok()
+            }
+        })
+        .unwrap_or(Decimal::new(1, 3));
+    let min_qty = pair
+        .and_then(|p| {
+            let s = p.min_qty_base.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Decimal::from_str(s).ok()
+            }
+        })
+        .unwrap_or(step);
+    let min_notional = pair
+        .and_then(|p| {
+            let s = p.min_notional_quote.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Decimal::from_str(s).ok()
+            }
+        })
+        .unwrap_or(Decimal::from(10));
+    if price <= Decimal::ZERO || step <= Decimal::ZERO {
+        return Ok(format_decimal(min_qty.max(Decimal::from(1))));
+    }
+    let qty_units = (min_notional / price / step).ceil();
+    let min_qty_units = (min_qty / step).ceil();
+    Ok(format_decimal(
+        qty_units.max(min_qty_units).max(Decimal::from(1)) * step,
+    ))
+}
+
+pub fn pick_usdt_zipper_asset(config: &DepositWithdrawConfig) -> Option<&ZipperAssetConfig> {
+    config.assets.iter().find(|asset| {
+        asset.ledger_id == 1
+            || asset.asset.eq_ignore_ascii_case("USDT")
+            || asset.name.eq_ignore_ascii_case("USDT")
+    })
+}
+
+pub fn human_amount_to_e18(amount: Decimal) -> anyhow::Result<U256> {
+    if amount <= Decimal::ZERO {
+        anyhow::bail!("amount must be positive");
+    }
+    let scaled = amount
+        .checked_mul(Decimal::from(1_000_000_000_000_000_000u128))
+        .ok_or_else(|| anyhow::anyhow!("amount is too large"))?;
+    if scaled != scaled.trunc() {
+        anyhow::bail!("amount {amount} does not scale cleanly to 18 decimals");
+    }
+    let raw = scaled
+        .to_u128()
+        .ok_or_else(|| anyhow::anyhow!("amount is out of u128 range"))?;
+    Ok(U256::from(raw))
 }
 
 fn align_to_step(value: Decimal, step: Decimal, round_up: bool) -> Decimal {
@@ -206,11 +297,12 @@ fn ledger_amount_to_decimal(raw: &str) -> Decimal {
     }
 }
 
+/// Spendable trading balance (`available`), not gross `trading` (which includes reserved).
 pub fn available_trading_balance(balances: &[AssetBalance], asset_id: u32) -> Decimal {
     balances
         .iter()
         .find(|b| b.asset_id == asset_id)
-        .map(|b| ledger_amount_to_decimal(&b.trading))
+        .map(|b| ledger_amount_to_decimal(&b.available))
         .unwrap_or(Decimal::ZERO)
 }
 

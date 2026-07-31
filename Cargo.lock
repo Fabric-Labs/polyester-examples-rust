@@ -1948,6 +1948,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 name = "polyester-examples"
 version = "0.1.0"
 dependencies = [
+ "alloy-primitives",
  "anyhow",
  "polyester-sdk",
  "rust_decimal",
@@ -1957,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "polyester-sdk"
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.23"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
