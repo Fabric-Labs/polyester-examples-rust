@@ -13,15 +13,21 @@ async fn main() -> anyhow::Result<()> {
     println!(
         "Authenticated as account_id={} username={}",
         me.account_id,
-        me.username.as_deref().unwrap_or("-")
+        me.username.as_deref().unwrap_or("(none)")
     );
 
     let balances = client.balances.list(GetBalancesRequest::default()).await?;
     println!("\nBalances ({})", balances.balances.len());
     for row in balances.balances.iter().take(10) {
+        let trading = polyester::codecs::scalars::format_ledger_u128(&row.trading, 18)
+            .unwrap_or_else(|_| row.trading.clone());
+        let funding = polyester::codecs::scalars::format_ledger_u128(&row.funding, 18)
+            .unwrap_or_else(|_| row.funding.clone());
+        let available = polyester::codecs::scalars::format_ledger_u128(&row.available, 18)
+            .unwrap_or_else(|_| row.available.clone());
         println!(
             "  asset_id={} trading={} funding={} available={}",
-            row.asset_id, row.trading, row.funding, row.available
+            row.asset_id, trading, funding, available
         );
     }
 
