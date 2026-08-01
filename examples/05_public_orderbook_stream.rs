@@ -42,10 +42,7 @@ async fn main() -> anyhow::Result<()> {
                     .and_then(|l| l.price.as_ref())
                     .map(|p| p.format())
                     .unwrap_or_else(|| "-".into());
-                println!(
-                    "  seq={} bid={best_bid} ask={best_ask}",
-                    book.book_seq
-                );
+                println!("  seq={} bid={best_bid} ask={best_ask}", book.book_seq);
                 seen += 1;
             }
             Ok(None) => {
@@ -55,9 +52,7 @@ async fn main() -> anyhow::Result<()> {
                 break;
             }
             Err(_) => {
-                println!(
-                    "No order book updates within 30s. The market may be quiet on devnet."
-                );
+                println!("No order book updates within 30s. The market may be quiet on devnet.");
                 break;
             }
         }

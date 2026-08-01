@@ -1,13 +1,15 @@
-//! Batch create two post-only limits, then flatten with cancel_all.
+//! Batch create two post-only limits, then batch_cancel by client order id.
 
-use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
+use polyester::models::{
+    BatchCancelItem, CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, OrderKey,
+};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::{Price, Quantity};
 use polyester_examples::{
-    available_trading_balance, buy_qty_for_quote_cap, cancel_all_for_symbol, client_from_env,
-    load_settings, pair_for_symbol, pick_symbol, quantity_scale_for_symbol, quote_asset_id,
-    require_trading_enabled, resolve_post_only_buy_limit_price, unique_client_order_id,
-    wait_for_catalogs, wait_for_open_order,
+    available_trading_balance, buy_qty_for_quote_cap, cancel_owned_orders_with_prefix,
+    client_from_env, load_settings, pair_for_symbol, pick_symbol, quantity_scale_for_symbol,
+    quote_asset_id, require_trading_enabled, resolve_post_only_buy_limit_price,
+    unique_client_order_id, wait_for_catalogs,
 };
 use rust_decimal::Decimal;
 use std::str::FromStr;
@@ -28,7 +30,6 @@ async fn main() -> anyhow::Result<()> {
     let price = resolve_post_only_buy_limit_price(&client, &symbol, pair.as_ref()).await?;
     let asset_id = quote_asset_id(&client, pair.as_ref(), &symbol)
         .ok_or_else(|| anyhow::anyhow!("could not resolve quote asset id for {symbol}"))?;
-
     let balances = client.balances.list(GetBalancesRequest::default()).await?;
     let available = available_trading_balance(&balances.balances, asset_id);
     let per_order_cap = settings.max_quote / Decimal::from(2);
@@ -39,14 +40,12 @@ async fn main() -> anyhow::Result<()> {
         pair.as_ref(),
     )?;
 
+    let cleanup_prefix = "example-bcancel";
     let client_order_ids = [
-        unique_client_order_id("example-batch-a"),
-        unique_client_order_id("example-batch-b"),
+        unique_client_order_id(cleanup_prefix),
+        unique_client_order_id(cleanup_prefix),
     ];
-    println!(
-        "Batch creating 2 post-only buy limits: symbol={symbol} price={price} qty={qty} each \
-         (max ~{per_order_cap} quote per order)"
-    );
+    println!("Batch create 2 post-only buys, then Orders.BatchCancel by client_order_id");
 
     let items: Vec<CreateOrderParams> = client_order_ids
         .iter()
@@ -71,58 +70,40 @@ async fn main() -> anyhow::Result<()> {
         })
         .collect::<anyhow::Result<_>>()?;
 
-    let created = match client.orders.batch_create(items, None, None).await {
-        Ok(c) => c,
-        Err(err) => {
-            cancel_all_for_symbol(&client, &symbol).await;
-            return Err(err.into());
-        }
-    };
+    let created = client.orders.batch_create(items, None, None).await?;
     println!(
         "Batch create: accepted={} rejected={}",
         created.accepted_count, created.rejected_count
     );
-    for item in &created.results {
+    if created.accepted_count == 0 {
+        anyhow::bail!("no batch orders were accepted");
+    }
+
+    let cancel_items = client_order_ids
+        .iter()
+        .map(|client_order_id| BatchCancelItem {
+            key: OrderKey::ClientOrderId(client_order_id.clone()),
+            symbol_id: None,
+        })
+        .collect();
+    let canceled = client.orders.batch_cancel(cancel_items, None, None).await?;
+    println!(
+        "Batch cancel: accepted={} rejected={}",
+        canceled.accepted_count, canceled.rejected_count
+    );
+    for item in &canceled.results {
         let code = if item.code.is_empty() {
             "-"
         } else {
-            item.code.as_str()
+            &item.code
         };
         println!(
             "  client_order_id={} status={} order_id={} code={code}",
             item.client_order_id, item.status, item.order_id
         );
     }
-    if created.accepted_count == 0 {
-        cancel_all_for_symbol(&client, &symbol).await;
-        anyhow::bail!("no batch orders were accepted");
-    }
 
-    for client_order_id in &client_order_ids {
-        match wait_for_open_order(
-            &client,
-            client_order_id,
-            settings.order_timeout_sec,
-            settings.poll_sec,
-        )
-        .await
-        {
-            Ok(open) => println!(
-                "Visible in open orders: {client_order_id} status={}",
-                open.status
-            ),
-            Err(err) => {
-                println!("  {client_order_id}: create accepted but open-order reads lagged ({err})")
-            }
-        }
-    }
-
-    let canceled = client.orders.cancel_all(Some(&symbol), false, None).await?;
-    println!(
-        "cancel_all: status={} matched_orders={} submitted_cancels={}",
-        canceled.status, canceled.matched_orders, canceled.submitted_cancels
-    );
-
-    cancel_all_for_symbol(&client, &symbol).await;
+    cancel_owned_orders_with_prefix(&client, cleanup_prefix).await?;
+    println!("BatchCancel demo complete; residual owned orders cleaned up");
     Ok(())
 }

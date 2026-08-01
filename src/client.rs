@@ -1,8 +1,8 @@
 //! Client construction for examples.
 
 use crate::config::{
-    ACCOUNT_ID_ENV, API_KEY_ID_ENV, API_PRIVATE_KEY_ENV, API_URL_ENV, SUB_ACCOUNT_ID_ENV, WS_URL_ENV,
-    load_dotenv,
+    ACCOUNT_ID_ENV, API_KEY_ID_ENV, API_PRIVATE_KEY_ENV, API_URL_ENV, SUB_ACCOUNT_ID_ENV,
+    WS_URL_ENV, load_dotenv, looks_like_placeholder_credential,
 };
 use polyester::{Client, Config};
 use std::env;
@@ -28,7 +28,7 @@ pub fn client_from_env(require_auth: bool) -> anyhow::Result<Client> {
     }
     if let Ok(account) = env::var(ACCOUNT_ID_ENV) {
         let account = account.trim();
-        if !account.is_empty() {
+        if !account.is_empty() && !looks_like_placeholder_credential(account) {
             cfg.default_account_id = Some(account.to_owned());
         }
     }
@@ -42,11 +42,11 @@ pub fn client_from_env(require_auth: bool) -> anyhow::Result<Client> {
     let key_id = env::var(API_KEY_ID_ENV)
         .ok()
         .map(|v| v.trim().to_owned())
-        .filter(|v| !v.is_empty());
+        .filter(|v| !v.is_empty() && !looks_like_placeholder_credential(v));
     let private_key = env::var(API_PRIVATE_KEY_ENV)
         .ok()
         .map(|v| v.trim().to_owned())
-        .filter(|v| !v.is_empty());
+        .filter(|v| !v.is_empty() && !looks_like_placeholder_credential(v));
 
     match (key_id, private_key) {
         (Some(id), Some(pk)) => {
@@ -60,6 +60,9 @@ pub fn client_from_env(require_auth: bool) -> anyhow::Result<Client> {
             );
         }
         _ => {}
+    }
+    if cfg.default_account_id.is_none() && require_auth {
+        anyhow::bail!("missing account id. Set {ACCOUNT_ID_ENV} (see .env.example).");
     }
 
     Ok(Client::new(cfg)?)

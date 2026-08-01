@@ -6,7 +6,7 @@ use polyester::{Price, Quantity};
 use polyester_examples::{
     available_trading_balance, base_asset_id, buy_qty_for_quote_cap, cancel_after_timeout,
     cancel_all_for_symbol, client_from_env, ensure_no_open_orders_with_prefix, format_decimal,
-    load_settings, marketable_limit_price, pair_for_symbol, pick_symbol, quantity_scale_for_pair,
+    load_settings, marketable_limit_price, pair_for_symbol, pick_symbol, quantity_scale_for_symbol,
     quote_asset_id, quote_asset_symbol, rsi_signal, sell_qty_for_quote_cap, unique_client_order_id,
     wait_for_catalogs,
 };
@@ -24,18 +24,24 @@ async fn main() -> anyhow::Result<()> {
     let spot = client.market_data.get_spot_config().await?;
     let symbol = pick_symbol(&spot, &settings.symbol);
     let pair = pair_for_symbol(&spot, &symbol);
-    let scale = quantity_scale_for_pair(pair.as_ref());
+    let scale = quantity_scale_for_symbol(&client, &symbol)?;
 
     let limit = settings.candle_limit.max(settings.rsi_period + 2);
     let candles = client
         .market_data
         .get_candles(&symbol, &settings.timeframe, Some(limit as u32))
         .await?;
-    let closes: Vec<Decimal> = candles
-        .candles
+    // The API returns newest-first (with the open candle prepended). RSI needs
+    // chronological input, so sort ascending and take the final row as latest.
+    let mut candle_rows = candles.candles;
+    candle_rows.sort_by_key(|c| c.ts_sec);
+    let closes: Vec<Decimal> = candle_rows
         .iter()
-        .filter_map(|c| Decimal::from_str(c.close.trim()).ok())
-        .collect();
+        .map(|c| {
+            Decimal::from_str(c.close.trim())
+                .map_err(|err| anyhow::anyhow!("invalid candle close at ts={}: {err}", c.ts_sec))
+        })
+        .collect::<anyhow::Result<_>>()?;
     if closes.is_empty() {
         anyhow::bail!("no candles returned for {symbol}");
     }
@@ -104,13 +110,17 @@ async fn main() -> anyhow::Result<()> {
             symbol: symbol.clone(),
             side,
             order_type: CreateOrderType::Limit,
-            quantity: Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None)?,
+            quantity: Some(Quantity::from_decimal_str(&qty, scale, Some(symbol.clone()), None)?),
+            max_quote_debit_scaled: None,
             price: Some(Price::from_decimal_str(&price, Some(symbol.clone()))?),
             time_in_force: Some(CreateTimeInForce::Gtc),
             client_order_id: Some(client_order_id.clone()),
             subaccount_id: None,
             post_only: Some(false),
             market_client_ref_price: None,
+            fee_asset: None,
+            self_trade_prevention: None,
+            market_max_slippage: None,
             attached_risk: None,
         })
         .await
