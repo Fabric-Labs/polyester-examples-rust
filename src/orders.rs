@@ -1,7 +1,7 @@
 //! Order wait / cleanup helpers.
 
-use polyester::models::{CancelOrderParams, ListOpenOrdersOpts, Order};
 use polyester::Client;
+use polyester::models::{CancelOrderParams, ListOpenOrdersOpts, Order, OrderKey};
 use std::time::{Duration, Instant};
 
 const OPEN_STATUSES: &[&str] = &["", "pending", "working", "pending_cancel"];
@@ -30,7 +30,7 @@ pub async fn wait_for_open_order(
     while Instant::now() < deadline {
         if let Ok(got) = client
             .orders
-            .get(Some(client_order_id), None, None)
+            .get(OrderKey::ClientOrderId(client_order_id.to_owned()), None)
             .await
             && let Some(order) = got.order
         {
@@ -60,9 +60,8 @@ pub async fn wait_for_open_order(
         tokio::time::sleep(poll).await;
     }
 
-    let mut msg = format!(
-        "order {client_order_id} was not visible as open within {timeout_sec:.0}s"
-    );
+    let mut msg =
+        format!("order {client_order_id} was not visible as open within {timeout_sec:.0}s");
     if !last_status.is_empty() {
         msg.push_str(&format!(" (last status={last_status})"));
     }
@@ -120,8 +119,7 @@ pub async fn cancel_order(
     client
         .orders
         .cancel_with(CancelOrderParams {
-            order_id: None,
-            client_order_id: Some(client_order_id.to_owned()),
+            key: OrderKey::ClientOrderId(client_order_id.to_owned()),
             symbol: Some(symbol.to_owned()),
             symbol_id: None,
             subaccount_id: None,
@@ -157,6 +155,37 @@ pub async fn ensure_no_open_orders_with_prefix(
     Ok(())
 }
 
+pub async fn cancel_owned_orders_with_prefix(client: &Client, prefix: &str) -> anyhow::Result<()> {
+    let open = client
+        .orders
+        .list_open_with(ListOpenOrdersOpts {
+            limit: Some(100),
+            ..Default::default()
+        })
+        .await?;
+    for order in open
+        .orders
+        .into_iter()
+        .filter(|o| o.client_order_id.starts_with(prefix))
+    {
+        let key = if !order.order_id.is_empty() && order.order_id != "0" {
+            OrderKey::OrderId(order.order_id)
+        } else {
+            OrderKey::ClientOrderId(order.client_order_id)
+        };
+        let _ = client
+            .orders
+            .cancel_with(CancelOrderParams {
+                key,
+                symbol: None,
+                symbol_id: Some(order.symbol_id),
+                subaccount_id: None,
+            })
+            .await;
+    }
+    Ok(())
+}
+
 /// Wait briefly for a fill/cancel; if still open, cancel and report the outcome.
 pub async fn cancel_after_timeout(
     client: &Client,
@@ -173,7 +202,7 @@ pub async fn cancel_after_timeout(
     while Instant::now() < deadline {
         if let Ok(got) = client
             .orders
-            .get(Some(client_order_id), None, None)
+            .get(OrderKey::ClientOrderId(client_order_id.to_owned()), None)
             .await
             && let Some(order) = got.order
         {
