@@ -78,9 +78,13 @@ run_example "06_market_overview_stream"
 # Authenticated reads
 if has_auth; then
   run_example "02_balances_and_orders_read"
+  run_example "19_preview_order"
+  run_example "20_lifecycle_flows"
   run_example "13_private_realtime"
 else
   skip_or_fail "02_balances_and_orders_read" "missing API credentials"
+  skip_or_fail "19_preview_order" "missing API credentials"
+  skip_or_fail "20_lifecycle_flows" "missing API credentials"
   skip_or_fail "13_private_realtime" "missing API credentials"
 fi
 
