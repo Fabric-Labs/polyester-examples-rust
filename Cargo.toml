@@ -8,7 +8,7 @@ description = "Runnable examples for the official Polyester Rust SDK."
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-polyester-sdk = { path = "../polyester-sdk-rust", version = "0.1.0-alpha.26", features = ["realtime"] }
+polyester-sdk = { path = "../polyester-sdk-rust", version = "0.1.0-alpha.27", features = ["realtime"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 serde_json = "1"
 rust_decimal = { version = "1", default-features = false, features = ["std"] }
