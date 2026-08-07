@@ -1958,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "polyester-sdk"
-version = "0.1.0-alpha.31"
+version = "0.1.0-alpha.33"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
