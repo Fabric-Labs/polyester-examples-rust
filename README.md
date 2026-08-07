@@ -124,7 +124,7 @@ Run examples from the repository root after configuring `.env`.
 | `01_public_market_data` | Optional | - | REST overview, trades, candles |
 | `02_balances_and_orders_read` | Required | - | Balances, open orders, history |
 | `19_preview_order` | Required | - | PreviewOrder admissibility + protected price bound |
-| `20_lifecycle_flows` | Required | - | Lifecycle reasons + Zipper rejection details |
+| `20_lifecycle_flows` | Required | `LIFECYCLE_TX_HASH` (optional) | Lifecycle reasons, Zipper details, paginated transaction matches |
 | `03_place_and_cancel_limit_order` | Required | `ENABLE_TRADING` | Decimal qty/price create + cancel |
 | `03b_scaled_int_limit_order` | Required | `ENABLE_TRADING` | Integer-native bot create + cancel |
 | `04_public_realtime_trades` | Optional | - | Public trade websocket |
@@ -175,6 +175,10 @@ cargo run --example 19_preview_order
 cargo run --example 20_lifecycle_flows
 cargo run --example 13_private_realtime
 ```
+
+Set `POLYESTER_EXAMPLES_LIFECYCLE_TX_HASH` before running example `20` to list
+every lifecycle flow associated with one transaction, following all pagination
+tokens.
 
 `13` subscribes to private orders and balances concurrently and prints up to
 `POLYESTER_EXAMPLES_STREAM_COUNT` events per stream (or 30s timeout). No trading flag.
