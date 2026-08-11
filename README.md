@@ -20,8 +20,9 @@ cargo fetch
 ```
 
 This repository uses a local path dependency on `../polyester-sdk-rust` when working inside the
-Fabric monorepo. Point `Cargo.toml` at a git tag when consuming a published SDK (crate is not on
-crates.io yet).
+Fabric monorepo. For a standalone clone, pin
+`polyester-sdk = "0.1.0-alpha.37"` from [crates.io](https://crates.io/crates/polyester-sdk)
+(or a git tag `v0.1.0a37`).
 
 ## Configure
 
