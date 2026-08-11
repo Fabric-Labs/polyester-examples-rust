@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
         .triggers
         .list_with(ListTriggersOpts {
             symbol: Some(symbol.clone()),
-            limit: 50,
+            limit: Some(50),
             ..Default::default()
         })
         .await

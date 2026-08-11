@@ -11,7 +11,20 @@ async fn main() -> anyhow::Result<()> {
     let overview = client.market_overview.list(Some(5)).await?;
     println!("Markets");
     for market in &overview.markets {
-        println!("  {}: symbol_id={}", market.symbol, market.symbol_id);
+        let last = market
+            .last_price
+            .as_ref()
+            .map(|p| p.format())
+            .unwrap_or_else(|| "-".into());
+        let index = market
+            .index_price
+            .as_ref()
+            .map(|p| p.format())
+            .unwrap_or_else(|| "-".into());
+        println!(
+            "  {}: symbol_id={} last_price={last} index_price={index}",
+            market.symbol, market.symbol_id
+        );
     }
 
     let spot = client.market_data.get_spot_config().await?;
