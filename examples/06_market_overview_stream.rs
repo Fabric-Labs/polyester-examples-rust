@@ -42,12 +42,16 @@ async fn main() -> anyhow::Result<()> {
             Ok(Some(rows)) => {
                 let focus = row_for_symbol(&rows, &symbol);
                 let label = focus.map(|r| r.symbol.as_str()).unwrap_or(symbol.as_str());
-                let price = focus
+                let last = focus
                     .and_then(|r| r.last_price.as_ref())
                     .map(|p| p.format())
                     .unwrap_or_else(|| "-".into());
+                let index = focus
+                    .and_then(|r| r.index_price.as_ref())
+                    .map(|p| p.format())
+                    .unwrap_or_else(|| "-".into());
                 println!(
-                    "  update={} rows={} {label} last_price={price}",
+                    "  update={} rows={} {label} last_price={last} index_price={index}",
                     seen + 1,
                     rows.len()
                 );
