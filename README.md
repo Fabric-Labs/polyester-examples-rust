@@ -126,6 +126,7 @@ Run examples from the repository root after configuring `.env`.
 | `02_balances_and_orders_read` | Required | - | Balances, open orders, history |
 | `19_preview_order` | Required | - | PreviewOrder admissibility + protected price bound |
 | `20_lifecycle_flows` | Required | `LIFECYCLE_TX_HASH` (optional) | Lifecycle reasons, Zipper details, paginated transaction matches |
+| `21_vip_fees_rate_limits` | Required | - | VIP catalog/status, effective spot fees, trading rate limits |
 | `03_place_and_cancel_limit_order` | Required | `ENABLE_TRADING` | Decimal qty/price create + cancel |
 | `03b_scaled_int_limit_order` | Required | `ENABLE_TRADING` | Integer-native bot create + cancel |
 | `04_public_realtime_trades` | Optional | - | Public trade websocket |
@@ -174,6 +175,7 @@ Realtime examples exit after 30 seconds if no data arrives (common on quiet devn
 cargo run --example 02_balances_and_orders_read
 cargo run --example 19_preview_order
 cargo run --example 20_lifecycle_flows
+cargo run --example 21_vip_fees_rate_limits
 cargo run --example 13_private_realtime
 ```
 
